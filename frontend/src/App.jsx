@@ -1,78 +1,108 @@
-import { useEffect, useState } from 'react'
-import apiClient from './api/client'
+import { useState } from 'react'
+import { login, logout, me, register } from './api/auth'
 import './App.css'
 
 function App() {
-  const [loading, setLoading] = useState(true)
-  const [health, setHealth] = useState(null)
-  const [error, setError] = useState('')
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    password_confirmation: '',
+  })
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState('')
 
-  const loadHealth = async () => {
-    setLoading(true)
-    setError('')
+  const onChange = (e) => {
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
+  }
 
+  const handleRegister = async () => {
     try {
-      const response = await apiClient.get('/api/health')
-      setHealth(response.data)
-    } catch (err) {
-      setHealth(null)
-      setError(
-        err?.response?.data?.message ||
-          'No se pudo conectar con el backend. Revisa que Laravel este corriendo en el puerto 8000.',
-      )
+      setLoading(true)
+      setMessage('')
+      await register(form)
+      const { data } = await me()
+      setUser(data)
+      setMessage('Registro exitoso y sesión iniciada.')
+    } catch (error) {
+      setMessage(error?.response?.data?.message || 'Error al registrar.')
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => {
-    loadHealth()
-  }, [])
+  const handleLogin = async () => {
+    try {
+      setLoading(true)
+      setMessage('')
+      await login({ email: form.email, password: form.password })
+      const { data } = await me()
+      setUser(data)
+      setMessage('Login exitoso.')
+    } catch (error) {
+      setMessage(error?.response?.data?.message || 'Error al iniciar sesión.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const statusLabel = health?.db === 'connected' ? 'Conectado' : 'Sin conexion'
-  const statusClass = health?.db === 'connected' ? 'ok' : 'error'
+  const handleMe = async () => {
+    try {
+      setLoading(true)
+      setMessage('')
+      const { data } = await me()
+      setUser(data)
+      setMessage('Usuario cargado.')
+    } catch (error) {
+      setUser(null)
+      setMessage(error?.response?.data?.message || 'No autenticado.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleLogout = async () => {
+    try {
+      setLoading(true)
+      setMessage('')
+      await logout()
+      setUser(null)
+      setMessage('Sesión cerrada.')
+    } catch (error) {
+      setMessage(error?.response?.data?.message || 'Error al cerrar sesión.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
-    <main className="page">
-      <section className="panel">
-        <p className="eyebrow">Huellas Solidarias</p>
-        <h1>Estado de API Laravel</h1>
-        <p className="subtitle">
-          Verificacion inicial de conexion entre frontend React y backend Laravel.
-        </p>
+    <main style={{ maxWidth: 560, margin: '2rem auto', padding: '1rem' }}>
+      <h1>Auth Breeze API</h1>
 
-        {loading && <p className="muted">Consultando /api/health...</p>}
+      <input name="name" placeholder="Nombre" value={form.name} onChange={onChange} style={{ width: '100%', marginBottom: 8 }} />
+      <input name="email" placeholder="Email" value={form.email} onChange={onChange} style={{ width: '100%', marginBottom: 8 }} />
+      <input name="password" type="password" placeholder="Password" value={form.password} onChange={onChange} style={{ width: '100%', marginBottom: 8 }} />
+      <input
+        name="password_confirmation"
+        type="password"
+        placeholder="Confirmar password"
+        value={form.password_confirmation}
+        onChange={onChange}
+        style={{ width: '100%', marginBottom: 12 }}
+      />
 
-        {!loading && error && (
-          <div className="alert error">
-            <p>{error}</p>
-          </div>
-        )}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+        <button onClick={handleRegister} disabled={loading}>Register</button>
+        <button onClick={handleLogin} disabled={loading}>Login</button>
+        <button onClick={handleMe} disabled={loading}>Me</button>
+        <button onClick={handleLogout} disabled={loading}>Logout</button>
+      </div>
 
-        {!loading && health && (
-          <div className="result">
-            <p>
-              API: <strong>{health.status}</strong>
-            </p>
-            <p>
-              App: <strong>{health.app}</strong>
-            </p>
-            <p>
-              DB:{' '}
-              <strong className={statusClass}>
-                {statusLabel} ({health.db})
-              </strong>
-            </p>
-            <p>
-              Timestamp: <code>{health.timestamp}</code>
-            </p>
-          </div>
-        )}
-
-        <button type="button" onClick={loadHealth} className="btn">
-          Probar de nuevo
-        </button>
-      </section>
+      {message && <p><strong>Estado:</strong> {message}</p>}
+      <pre style={{ background: '#f4f4f4', padding: 12, borderRadius: 8 }}>
+        {JSON.stringify(user, null, 2)}
+      </pre>
     </main>
   )
 }
